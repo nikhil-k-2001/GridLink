@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Loader2, Play, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { API_URL, api } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type { ApiTest, Page, Provider } from "@/lib/types";
 import { fmtDate, fmtNum } from "@/lib/format";
@@ -27,15 +27,15 @@ const PRESETS: Preset[] = [
   { label: "MaStR bulk-download page (real)", provider: "Marktstamm", name: "MaStR Datendownload page", url: "https://www.marktstammdatenregister.de/MaStR/Datendownload",
     params: [], headers: [], note: "Real page: confirm the daily export exists and its date." },
   { label: "France DSO — consent granted (simulated)", provider: "Enedis", name: "FR DSO load curve — Plaine de Beauce",
-    url: "http://localhost:8000/simulated/fr-dso/v5/metering_data/production_load_curve",
+    url: `${API_URL}/simulated/fr-dso/v5/metering_data/production_load_curve`,
     params: [{ k: "usage_point_id", v: "99000000000101" }, { k: "start", v: "2026-11-18" }, { k: "end", v: "2026-11-19" }],
     headers: [{ k: "Authorization", v: "Bearer sim-fr-oauth-token" }], note: "Simulated platform. 30-min W, interval-end Paris time." },
   { label: "France DSO — consent revoked (simulated)", provider: "Enedis", name: "FR DSO load curve — Provence Solar II",
-    url: "http://localhost:8000/simulated/fr-dso/v5/metering_data/production_load_curve",
+    url: `${API_URL}/simulated/fr-dso/v5/metering_data/production_load_curve`,
     params: [{ k: "usage_point_id", v: "99000000000104" }, { k: "start", v: "2026-11-18" }, { k: "end", v: "2026-11-19" }],
     headers: [{ k: "Authorization", v: "Bearer sim-fr-oauth-token" }], note: "Simulated. Expect 403: the owner revoked consent at the DSO." },
   { label: "Spain DSO — hourly kWh (simulated)", provider: "Datadis", name: "ES DSO production — Extremadura Solar",
-    url: "http://localhost:8000/simulated/es-dso/api-private/api/get-production-data",
+    url: `${API_URL}/simulated/es-dso/api-private/api/get-production-data`,
     params: [{ k: "cups", v: "ES0000SIM0000000202ZZ" }, { k: "startDate", v: "2026/11/18" }, { k: "endDate", v: "2026/11/18" }],
     headers: [{ k: "Authorization", v: "Bearer sim-es-token" }], note: "Simulated. Hour-ending labels incl. '24:00'; some values 'Estimada'." },
 ];
@@ -108,7 +108,7 @@ export default function ApiBenchPage() {
             <KVEditor label="Headers (values of auth headers are redacted when stored)" rows={f.headers} onChange={(headers) => setF({ ...f, headers })} />
             {f.method === "POST" && <Field label="Body"><Textarea rows={4} className="font-mono text-xs" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></Field>}
             <Button type="submit" disabled={busy || !f.url}>{busy ? <Loader2 className="animate-spin" /> : <Play />}Send request</Button>
-            <p className="text-[11px] text-muted-foreground">Allowed hosts: {allow.data?.hosts.join(", ")} and the simulated DSO platforms on localhost.</p>
+            <p className="text-[11px] text-muted-foreground">Allowed hosts: {allow.data?.hosts.join(", ")} and the simulated DSO platforms on this API.</p>
           </form>
         </Section>
         <Section title="Response">{result ? <ResultView key={result.id} t={result} onSaved={history.reload} /> : <Empty>Pick a preset or enter a request, then send it.</Empty>}</Section>

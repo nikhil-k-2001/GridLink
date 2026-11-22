@@ -174,7 +174,7 @@ class FrDsoSimConnector(SimDsoConnector):
     provider_slug = "enedis"
     mapping_name = "fr_dso_sim"
     platform = "fr-dso"
-    default_base_url = "http://localhost:8000/simulated/fr-dso"
+    default_base_url = "https://dso.simulated.invalid/fr-dso"  # served in-process; never leaves the server
 
     def request_for(self, plant, first_day, last_day):
         # this API's `end` is exclusive
@@ -206,7 +206,7 @@ class EsDsoSimConnector(SimDsoConnector):
     provider_slug = "datadis"
     mapping_name = "es_dso_sim"
     platform = "es-dso"
-    default_base_url = "http://localhost:8000/simulated/es-dso"
+    default_base_url = "https://dso.simulated.invalid/es-dso"  # served in-process; never leaves the server
 
     def request_for(self, plant, first_day, last_day):
         # this API's endDate is inclusive

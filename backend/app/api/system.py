@@ -15,8 +15,13 @@ router = APIRouter(tags=["system"])
 
 @router.get("/health")
 def health(db: DB):
-    db.execute(text("SELECT 1"))
-    return {"status": "ok", "time": datetime.now(UTC)}
+    from app.setup import STATE
+
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {type(exc).__name__}. Check DATABASE_URL.") from exc
+    return {"status": "ok", "setup": STATE, "time": datetime.now(UTC)}
 
 
 @router.get("/settings/status")

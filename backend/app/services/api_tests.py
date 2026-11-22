@@ -53,10 +53,10 @@ def check_target(url: str, settings: Settings) -> str:
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         raise ApiTestRejected("URL must be http(s) with a host")
-    if u.hostname in LOCAL_HOSTS:
+    if u.hostname in LOCAL_HOSTS or u.hostname in settings.self_hosts:
         if u.path.startswith("/simulated/"):
             return "simulated"
-        raise ApiTestRejected("Only the /simulated/ DSO platforms may be called on localhost")
+        raise ApiTestRejected("Only the /simulated/ DSO platforms may be called on this API's own host")
     if u.scheme != "https":
         raise ApiTestRejected("External providers must be called over https")
     if u.hostname not in settings.api_test_allowed_hosts:
