@@ -1,0 +1,29 @@
+# Refreshes GridLink's real-time sources (Energi Data Service) every 15 minutes.
+# Vercel's Hobby plan only allows daily cron jobs, so this free GitHub schedule calls the API instead.
+# Requires the repository secret CRON_SECRET (same value as the gridlink-api Vercel env var).
+# GitHub runs schedules on a best-effort basis (often a few minutes late) and pauses them in public
+# repos after 60 days without repository activity.
+name: Real-time refresh
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call /cron/realtime-sync
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET is not configured for this repository; skipping refresh."
+            exit 0
+          fi
+          curl -fsS --max-time 90 -H "Authorization: Bearer $CRON_SECRET" \
+            https://gridlink-api.vercel.app/cron/realtime-sync
