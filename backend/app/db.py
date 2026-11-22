@@ -14,10 +14,16 @@ _engine = None
 _SessionLocal: sessionmaker[Session] | None = None
 
 
+def engine_kwargs(url: str) -> dict:
+    """psycopg 3 prepares repeated statements server-side, which breaks behind transaction poolers
+    (Supabase/Neon pooled endpoints). Disable it for Postgres; it is a minor optimisation here."""
+    return {"connect_args": {"prepare_threshold": None}} if url.startswith("postgresql+psycopg") else {}
+
+
 def init_engine(url: str | None = None, **kwargs):
     global _engine, _SessionLocal
     url = url or get_settings().database_url
-    _engine = create_engine(url, pool_pre_ping=True, future=True, **kwargs)
+    _engine = create_engine(url, pool_pre_ping=True, future=True, **engine_kwargs(url), **kwargs)
     _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False, autoflush=False)
     return _engine
 

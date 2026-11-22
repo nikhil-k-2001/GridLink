@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # DATABASE_URL (Neon via the Vercel Marketplace) or POSTGRES_URL; postgres:// URLs are normalised for psycopg 3.
     database_url: str = Field(default="postgresql+psycopg://gridlink:gridlink@localhost:5434/gridlink",
                               validation_alias=AliasChoices("DATABASE_URL", "POSTGRES_URL", "database_url"))
+    # Direct (non-pooled) connection for migrations and the setup lock. Hosted Postgres behind a transaction
+    # pooler (Supabase, Neon pooled) must not run session-level advisory locks through the pooler.
+    migration_database_url: str | None = Field(
+        default=None, validation_alias=AliasChoices("DATABASE_URL_UNPOOLED", "POSTGRES_URL_NON_POOLING", "migration_database_url"))
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     # Also allow the deployed web app (production + preview URLs on Vercel).
     cors_origin_regex: str | None = r"https://gridlink-web[a-z0-9-]*\.vercel\.app"
@@ -47,17 +51,41 @@ class Settings(BaseSettings):
     http_backoff_base_seconds: float = 1.0
     log_level: str = "INFO"
 
-    @field_validator("database_url")
+    @field_validator("database_url", "migration_database_url")
     @classmethod
-    def _psycopg_scheme(cls, v: str) -> str:
-        for prefix in ("postgres://", "postgresql://"):
-            if v.startswith(prefix):
-                return "postgresql+psycopg://" + v[len(prefix):]
-        return v
+    def _psycopg_url(cls, v: str | None) -> str | None:
+        return normalise_db_url(v) if v else v
+
+    @property
+    def effective_migration_url(self) -> str:
+        return self.migration_database_url or self.database_url
 
     @property
     def self_hosts(self) -> set[str]:
         return {h for h in (self.vercel_url, self.vercel_project_production_url) if h}
+
+
+# Provider-specific query options that libpq/psycopg do not understand (e.g. Supabase adds ?supa=...).
+_DROP_QUERY_KEYS = {"supa", "pgbouncer", "schema", "connection_limit", "pool_timeout"}
+
+
+def normalise_db_url(url: str) -> str:
+    """postgres:// -> postgresql+psycopg:// and drop query options libpq would reject."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            url = "postgresql+psycopg://" + url[len(prefix):]
+            break
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in _DROP_QUERY_KEYS]
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def is_transaction_pooler(url: str) -> bool:
+    from urllib.parse import urlsplit
+
+    return urlsplit(url).port == 6543
 
 
 @lru_cache

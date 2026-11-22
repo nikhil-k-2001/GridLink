@@ -7,9 +7,10 @@ logged and reported by /health instead of crashing the app, so a missing databas
 import logging
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
-from app.db import get_engine
+from app.config import get_settings, is_transaction_pooler
+from app.db import engine_kwargs
 
 log = logging.getLogger("gridlink.setup")
 LOCK_ID = 42_4242
@@ -18,9 +19,14 @@ STATE: dict[str, str | None] = {"status": "not_run", "error": None}
 
 def ensure_ready() -> None:
     try:
-        engine = get_engine()
+        url = get_settings().effective_migration_url
+        # A session lock through a transaction pooler could stick to a pooled backend forever: only lock on a
+        # direct connection. Without one, setup still works; concurrent first starts are merely unserialised.
+        use_lock = not is_transaction_pooler(url)
+        engine = create_engine(url, **engine_kwargs(url))
         with engine.connect() as conn:
-            conn.execute(text("SELECT pg_advisory_lock(:id)"), {"id": LOCK_ID})
+            if use_lock:
+                conn.execute(text("SELECT pg_advisory_lock(:id)"), {"id": LOCK_ID})
             try:
                 from alembic.config import Config
 
@@ -36,8 +42,10 @@ def ensure_ready() -> None:
                     seed()
                     log.info("demo workspace seeded")
             finally:
-                conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": LOCK_ID})
+                if use_lock:
+                    conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": LOCK_ID})
                 conn.commit()
+        engine.dispose()
         STATE.update(status="ready", error=None)
     except Exception as exc:  # report, don't crash: /health explains what is wrong
         STATE.update(status="failed", error=f"{type(exc).__name__}: {str(exc)[:300]}")
