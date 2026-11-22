@@ -80,7 +80,8 @@ def build_http_client(connector_type: str, settings: Settings, transport: httpx.
         max_retries=settings.http_max_retries,
         backoff_base=settings.http_backoff_base_seconds,
         # ENTSO-E documents a per-user request limit; stay well below it. SMARD: be polite.
-        min_interval_seconds=0.5 if connector_type.startswith("entsoe") else 0.25,
+        # Respect provider limits: ENTSO-E documents a per-user rate; Energi Data Service rate-limits bursts hard.
+        min_interval_seconds={"entsoe": 0.5, "energinet": 2.0}.get(connector_type.split("_")[0], 0.25),
         redact=redact_token,
         **kwargs,
     )

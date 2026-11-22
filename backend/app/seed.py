@@ -46,10 +46,12 @@ PROVIDERS = [
     {
         "slug": "energinet", "name": "Energi Data Service (Energinet)", "country_code": "DK",
         "website": "https://www.energidataservice.dk/", "documentation_url": "https://www.energidataservice.dk/guides/api-guides",
-        "description": "Danish TSO open data portal: production, consumption, CO2 emissions and spot prices for DK1/DK2.",
-        "status": "discovered", "authentication_type": "None (assumed)", "data_formats": ["JSON", "CSV"],
-        "access_requirements": "To verify", "next_action": "Verify API access and licence; map datasets to standard schema.",
-        "owner": "Unassigned",
+        "description": "Danish TSO open data portal: real-time (1-minute) power system data, 15-minute day-ahead prices for DK1/DK2 "
+                       "and neighbours, settlement data.",
+        "status": "connected", "authentication_type": "None (public API)", "data_formats": ["JSON", "CSV"],
+        "access_requirements": "Public, no key. Strict burst rate limit (HTTP 429 with wait time in the body).",
+        "registration_status": "Not required", "last_investigated_at": CHECKED,
+        "next_action": "Add settlement data (ProductionConsumptionSettlement) for corrected statistics.", "owner": "Data Integration TPM",
     },
     {
         "slug": "rte-eco2mix", "name": "RTE éCO2mix / ODRÉ", "country_code": "FR",
@@ -121,7 +123,24 @@ FACTS = {
     ],
 }
 
-for slug in ("energinet", "rte-eco2mix", "elexon-bmrs", "netztransparenz", "fingrid"):
+FACTS["energinet"] = [
+    ("access", "Public REST API, no key: /dataset/<name>?start&end&timezone=utc&columns&filter&sort&limit=0.", "verified",
+     "https://api.energidataservice.dk/dataset/PowerSystemRightNow"),
+    ("format", "PowerSystemRightNow: 1-minute MW values, newest value about 1 minute old.", "verified",
+     "https://api.energidataservice.dk/meta/dataset/PowerSystemRightNow"),
+    ("quality", "Real-time values are upscaled SCADA measurements; the provider says errors will generally not be corrected — "
+                "use settlement data (published ~12 days later) for statistics.", "researched",
+     "https://api.energidataservice.dk/meta/dataset/PowerSystemRightNow"),
+    ("format", "DayAheadPrices gives 15-minute prices for DK1, DK2 and DE; its DE value matched SMARD for the same quarter-hour.",
+     "verified", "https://api.energidataservice.dk/dataset/DayAheadPrices"),
+    ("stability", "The hourly Elspotprices dataset ends on 2025-09-30 (move to 15-minute day-ahead products).", "verified",
+     "https://api.energidataservice.dk/dataset/Elspotprices"),
+    ("limits", "Bursts are rate-limited: HTTP 429 'Try again in 36 seconds' after a handful of quick requests.", "verified", None),
+    ("limits", "Provider guidance: a request about every minute is enough for the latest real-time data.", "researched",
+     "https://api.energidataservice.dk/meta/dataset/PowerSystemRightNow"),
+]
+
+for slug in ("rte-eco2mix", "elexon-bmrs", "netztransparenz", "fingrid"):
     FACTS[slug] = [("access", "Access model and licence have not yet been verified by GridLink.", "assumption", None)]
 
 INVESTIGATIONS = {
@@ -226,6 +245,10 @@ def seed() -> None:
              {"lookback_days": 7, "resolution": "quarterhour", "language": "en"}, 1440, 360),
             ("ENTSO-E DE-LU – live API", "entsoe_api", "entsoe", "real",
              {"area": "DE-LU", "lookback_days": 3, "datasets": ["generation", "load", "day_ahead_price"]}, 240, 60),
+            ("ENTSO-E day-ahead prices — FR, ES, NL, IT zones (live API)", "entsoe_api", "entsoe", "real",
+             {"areas": ["FR", "ES", "NL", "IT-SUD", "IT-SICI"], "datasets": ["day_ahead_price"], "lookback_days": 3}, 1440, 60),
+            ("Denmark real-time power & prices (Energi Data Service)", "energinet_api", "energinet", "real",
+             {"lookback_days": 1}, 15, 15),
             ("ENTSO-E DE-LU – SIMULATED fixtures", "entsoe_fixture", "entsoe", "simulated",
              {"area": "DE-LU", "fixed_window": ["2026-11-13T23:00:00+00:00", "2026-11-20T23:00:00+00:00"]}, 240, None),
         ]
@@ -235,6 +258,7 @@ def seed() -> None:
                                  data_origin=origin, config=cfg, max_data_lag_minutes=lag,
                                  sync_interval_minutes=interval,
                                  status="awaiting_credentials" if ctype == "entsoe_api" else "active"))
+        db.flush()
 
         for slug, fields in INVESTIGATIONS.items():
             p = by_slug[slug]

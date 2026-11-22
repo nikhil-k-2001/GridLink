@@ -191,7 +191,7 @@ def register(cls: type[BaseConnector]) -> type[BaseConnector]:
 
 def get_connector_class(connector_type: str) -> type[BaseConnector]:
     # Import side effect registers built-in connectors.
-    from app.connectors import dso_sim, entsoe, smard  # noqa: F401
+    from app.connectors import dso_sim, energinet, entsoe, smard  # noqa: F401
 
     try:
         return CONNECTOR_REGISTRY[connector_type]

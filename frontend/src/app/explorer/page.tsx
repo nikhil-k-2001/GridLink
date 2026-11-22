@@ -67,7 +67,7 @@ export default function ExplorerPage() {
         <Field label="Aggregation"><NativeSelect value={bucket} onChange={(e) => setBucket(e.target.value)}>
           <option value="15min">15 minutes</option><option value="hour">Hourly mean</option><option value="day">Daily mean</option></NativeSelect></Field>
         <Field label="Country"><NativeSelect value={country} onChange={(e) => setCountry(e.target.value)}>
-          <option value="DE">Germany (DE)</option><option value="">All countries</option></NativeSelect></Field>
+          <option value="DE">Germany (DE)</option><option value="DK">Denmark (DK) — real-time</option><option value="">All countries</option></NativeSelect></Field>
         <Field label="Provider"><NativeSelect value={providerId} onChange={(e) => setProviderId(e.target.value)}>
           <option value="">All providers</option>{providers.data?.items.filter((p) => p.connector_count).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</NativeSelect></Field>
         <label className="flex h-8 items-center gap-2 text-sm"><Switch checked={includeSim} onCheckedChange={setIncludeSim} />Include simulated data</label>

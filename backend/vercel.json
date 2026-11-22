@@ -4,6 +4,7 @@
     "app/main.py": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/cron/daily-sync", "schedule": "0 6 * * *" }
+    { "path": "/cron/daily-sync", "schedule": "0 6 * * *" },
+    { "path": "/cron/realtime-sync", "schedule": "*/15 * * * *" }
   ]
 }

@@ -5,6 +5,46 @@
     "DE-LU": {
       "eic": "10Y1001A1001A82H",
       "country_code": "DE"
+    },
+    "FR": {
+      "eic": "10YFR-RTE------C",
+      "country_code": "FR"
+    },
+    "ES": {
+      "eic": "10YES-REE------0",
+      "country_code": "ES"
+    },
+    "NL": {
+      "eic": "10YNL----------L",
+      "country_code": "NL"
+    },
+    "IT-NORD": {
+      "eic": "10Y1001A1001A73I",
+      "country_code": "IT"
+    },
+    "IT-CNOR": {
+      "eic": "10Y1001A1001A70O",
+      "country_code": "IT"
+    },
+    "IT-CSUD": {
+      "eic": "10Y1001A1001A71M",
+      "country_code": "IT"
+    },
+    "IT-SUD": {
+      "eic": "10Y1001A1001A788",
+      "country_code": "IT"
+    },
+    "IT-CALA": {
+      "eic": "10Y1001C--00096J",
+      "country_code": "IT"
+    },
+    "IT-SICI": {
+      "eic": "10Y1001A1001A75E",
+      "country_code": "IT"
+    },
+    "IT-SARD": {
+      "eic": "10Y1001A1001A74G",
+      "country_code": "IT"
     }
   },
   "requests": {
@@ -252,5 +292,6 @@
       -500,
       5000
     ]
-  }
+  },
+  "areas_note": "EIC area codes from the ENTSO-E area list; verify each on the first live call (an unknown code returns an acknowledgement, not data)."
 }

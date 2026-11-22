@@ -1,0 +1,44 @@
+{
+  "provider": "energinet",
+  "country_code": "DK",
+  "note": "Energi Data Service (Energinet, Danish TSO). Real, public, no key. Rate-limited: keep requests few and spaced.",
+  "datasets": {
+    "realtime": {
+      "dataset": "PowerSystemRightNow",
+      "time_column": "Minutes1UTC",
+      "interval_minutes": 1,
+      "columns": ["SolarPower", "OnshoreWindPower", "OffshoreWindPower"],
+      "max_data_lag_minutes": 15,
+      "ignored_columns": "ProductionGe100MW / ProductionLt100MW mix fuels (cannot be mapped to one energy source); exchanges, CO2 and aFRR are out of scope"
+    },
+    "day_ahead_price": {
+      "dataset": "DayAheadPrices",
+      "time_column": "TimeUTC",
+      "interval_minutes": 15,
+      "areas": ["DK1", "DK2", "DE"],
+      "max_data_lag_minutes": 1440,
+      "publishes_ahead": true
+    }
+  },
+  "price_areas": {"DK1": {"country_code": "DK", "bidding_zone": "DK1"}, "DK2": {"country_code": "DK", "bidding_zone": "DK2"},
+                  "DE": {"country_code": "DE", "bidding_zone": "DE-LU"}},
+  "series": {
+    "realtime::SolarPower": {"dataset_key": "energinet_rt_solar", "dataset_name": "Real-time solar power (DK)", "metric_type": "generation",
+      "energy_source": "solar", "unit": "MW", "frequency": "PT1M",
+      "description": "Power System Right Now: 1-minute upscaled SCADA measurements. Not corrected later — use settlement data for statistics."},
+    "realtime::OnshoreWindPower": {"dataset_key": "energinet_rt_wind_onshore", "dataset_name": "Real-time onshore wind (DK)", "metric_type": "generation",
+      "energy_source": "wind_onshore", "unit": "MW", "frequency": "PT1M",
+      "description": "Power System Right Now: 1-minute upscaled SCADA measurements. Not corrected later."},
+    "realtime::OffshoreWindPower": {"dataset_key": "energinet_rt_wind_offshore", "dataset_name": "Real-time offshore wind (DK)", "metric_type": "generation",
+      "energy_source": "wind_offshore", "unit": "MW", "frequency": "PT1M",
+      "description": "Power System Right Now: 1-minute upscaled SCADA measurements. Not corrected later."},
+    "price::DK1": {"dataset_key": "energinet_da_price_dk1", "dataset_name": "Day-ahead price DK1", "metric_type": "day_ahead_price",
+      "energy_source": "all", "unit": "EUR/MWh", "frequency": "PT15M", "description": "DayAheadPrices (15-min MTU), price area DK1 (West Denmark)."},
+    "price::DK2": {"dataset_key": "energinet_da_price_dk2", "dataset_name": "Day-ahead price DK2", "metric_type": "day_ahead_price",
+      "energy_source": "all", "unit": "EUR/MWh", "frequency": "PT15M", "description": "DayAheadPrices (15-min MTU), price area DK2 (East Denmark)."},
+    "price::DE": {"dataset_key": "energinet_da_price_de", "dataset_name": "Day-ahead price DE-LU (as published by Energinet)", "metric_type": "day_ahead_price",
+      "energy_source": "all", "unit": "EUR/MWh", "frequency": "PT15M",
+      "description": "Energinet's copy of the DE-LU day-ahead price — an independent cross-check of SMARD."}
+  },
+  "validation": {"non_negative_metrics": ["generation"], "max_mw": {"generation": 12000}, "price_range": [-500, 5000]}
+}

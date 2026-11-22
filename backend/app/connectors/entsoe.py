@@ -78,9 +78,32 @@ class EntsoeConnector(BaseConnector):
     provider_slug = "entsoe"
     mapping_name = "entsoe"
 
+    def __init__(self, config, settings, http=None):
+        super().__init__(config, settings, http)
+        # One series per zone: prices of different zones at the same time are not duplicates of each other.
+        for area in self.areas:
+            if area == "DE-LU":
+                continue
+            if area not in self.mapping["areas"]:
+                raise ConnectorError("fetch", "unknown_area", f"No EIC code mapped for area '{area}'")
+            for key, spec in list(self.mapping["series"].items()):
+                if "@" not in key:
+                    self.mapping["series"][self.series_key(key, area)] = {
+                        **spec, "dataset_key": f"{spec['dataset_key']}_{area.lower().replace('-', '_')}",
+                        "dataset_name": f"{spec.get('dataset_name', key)} ({area})"}
+
     @property
     def area(self) -> str:
-        return self.config.get("area", "DE-LU")
+        return self.areas[0]
+
+    @property
+    def areas(self) -> list[str]:
+        return list(self.config.get("areas") or [self.config.get("area", "DE-LU")])
+
+    @staticmethod
+    def series_key(base: str, area: str) -> str:
+        """DE-LU keeps the original keys (backwards compatible); other zones get an @zone suffix."""
+        return base if area == "DE-LU" else f"{base}@{area}"
 
     def request_kinds(self) -> list[str]:
         return self.config.get("datasets") or list(self.mapping["requests"])
@@ -106,9 +129,9 @@ class EntsoeConnector(BaseConnector):
         return AuthResult(ok=True, method="security_token", message="Security token present (validated on first request)")
 
     # ---------------------------------------------------------------------------------------------
-    def _params(self, kind: str, start: datetime, end: datetime) -> dict[str, str]:
+    def _params(self, kind: str, start: datetime, end: datetime, area: str | None = None) -> dict[str, str]:
         req = self.mapping["requests"][kind]
-        eic = self.mapping["areas"][self.area]["eic"]
+        eic = self.mapping["areas"][area or self.area]["eic"]
         params = {"documentType": req["documentType"], "periodStart": fmt_period(start), "periodEnd": fmt_period(end)}
         if "processType" in req:
             params["processType"] = req["processType"]
@@ -126,8 +149,8 @@ class EntsoeConnector(BaseConnector):
         start = window_start
         while start < window_end:
             end = min(window_end, start + timedelta(days=max_days))
-            for kind in self.request_kinds():
-                params = self._params(kind, start, end)
+            for kind, area in [(k, a) for k in self.request_kinds() for a in self.areas]:
+                params = self._params(kind, start, end, area)
                 try:
                     resp = self.http.request("GET", self.settings.entsoe_base_url, params={**params, "securityToken": token})
                 except HTTPRequestFailed as exc:
@@ -148,22 +171,22 @@ class EntsoeConnector(BaseConnector):
                         pass
                     if "No matching data" in reason:
                         # A valid 'no data' answer: record it, do not treat as a transport failure.
-                        payloads.append(self._payload(params, resp, kind))
+                        payloads.append(self._payload(params, resp, kind, area))
                         continue
                     raise ConnectorError("fetch", "provider_http_error",
                                          f"ENTSO-E {kind} returned HTTP {resp.status_code}: {reason}", http_status=resp.status_code)
-                payloads.append(self._payload(params, resp, kind))
+                payloads.append(self._payload(params, resp, kind, area))
             start = end
         return payloads
 
-    def _payload(self, params, resp, kind) -> FetchedPayload:
+    def _payload(self, params, resp, kind, area="DE-LU") -> FetchedPayload:
         return FetchedPayload(
             request_url=redact_token(str(resp.request.url)) if resp.request else self.settings.entsoe_base_url,
             request_params=params,
             http_status=resp.status_code,
             content_type=resp.headers.get("content-type"),
             body=resp.content,
-            meta={"kind": kind},
+            meta={"kind": kind, "area": area},
         )
 
     # ---------------------------------------------------------------------------------------------
@@ -185,7 +208,8 @@ class EntsoeConnector(BaseConnector):
             raise ConnectorError("parse", "unexpected_document", f"Unexpected ENTSO-E document type '{doc}'")
 
         doc_type = _text(root, "type")
-        country = self.mapping["areas"].get(self.area, {}).get("country_code", "DE")
+        area = payload.meta.get("area", self.area)
+        country = self.mapping["areas"].get(area, {}).get("country_code", "DE")
         for ts_i, ts in enumerate(_children(root, "TimeSeries")):
             if doc_type == "A75":
                 psr = _text(ts, "MktPSRType/psrType") or "UNKNOWN"
@@ -203,10 +227,11 @@ class EntsoeConnector(BaseConnector):
                 return result
             curve = _text(ts, "curveType") or "A01"
             for period in _children(ts, "Period"):
-                self._parse_period(period, series_key, unit, value_tag, curve, country, payload_index, ts_i, result)
+                self._parse_period(period, self.series_key(series_key, area), unit, value_tag, curve, country,
+                                   payload_index, ts_i, result, area)
         return result
 
-    def _parse_period(self, period, series_key, unit, value_tag, curve, country, payload_index, ts_i, result):
+    def _parse_period(self, period, series_key, unit, value_tag, curve, country, payload_index, ts_i, result, area="DE-LU"):
         start_raw = _text(period, "timeInterval/start")
         end_raw = _text(period, "timeInterval/end")
         res_raw = _text(period, "resolution") or ""
@@ -254,8 +279,8 @@ class EntsoeConnector(BaseConnector):
                     value=val,
                     unit=unit,
                     country_code=country,
-                    bidding_zone=self.area,
-                    source_record_id=f"entsoe:{series_key}:{self.area}:{minutes}:{ts.strftime('%Y-%m-%dT%H:%MZ')}",
+                    bidding_zone=area,
+                    source_record_id=f"entsoe:{series_key}:{area}:{minutes}:{ts.strftime('%Y-%m-%dT%H:%MZ')}",
                     payload_index=payload_index,
                     location=f"TimeSeries[{ts_i}] position {pos}" + (f" ({transform_note})" if transform_note else ""),
                     parse_error=err,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -34,10 +35,16 @@ class HTTPRequestFailed(Exception):
         self.attempts = attempts
 
 
+_BODY_WAIT = re.compile(r"(?:try again|retry) in (\d+(?:\.\d+)?) ?s", re.I)
+
+
 def _retry_after_seconds(resp: httpx.Response) -> float | None:
+    """Retry-After header (seconds or HTTP date); some providers only say it in the body
+    (e.g. Energi Data Service: "Rate limit is exceeded. Try again in 36 seconds.")."""
     header = resp.headers.get("Retry-After")
     if not header:
-        return None
+        m = _BODY_WAIT.search(resp.text[:500]) if resp.content else None
+        return float(m.group(1)) if m else None
     try:
         return max(0.0, float(header))
     except ValueError:
