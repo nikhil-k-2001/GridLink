@@ -1,0 +1,282 @@
+{
+  "provider": "smard",
+  "source_timezone": "Europe/Berlin",
+  "country_code": "DE",
+  "categories": {
+    "generation": {
+      "region": "DE",
+      "module_ids": [
+        1004066,
+        1001226,
+        1001225,
+        1004067,
+        1004068,
+        1001228,
+        1001223,
+        1004069,
+        1004071,
+        1004070,
+        1001227
+      ],
+      "bidding_zone": null,
+      "max_data_lag_minutes": 1440
+    },
+    "consumption": {
+      "region": "DE",
+      "module_ids": [
+        5000410,
+        5004359,
+        5004387
+      ],
+      "bidding_zone": null,
+      "max_data_lag_minutes": 1440
+    },
+    "day_ahead_price": {
+      "region": "DE-LU",
+      "module_ids": [
+        8004169
+      ],
+      "bidding_zone": "DE-LU",
+      "max_data_lag_minutes": 1440,
+      "publishes_ahead": true
+    }
+  },
+  "column_aliases": {
+    "generation": {
+      "Biomass": "generation::Biomass",
+      "Biomasse": "generation::Biomass",
+      "Hydropower": "generation::Hydropower",
+      "Wasserkraft": "generation::Hydropower",
+      "Wind offshore": "generation::Wind offshore",
+      "Wind Offshore": "generation::Wind offshore",
+      "Wind onshore": "generation::Wind onshore",
+      "Wind Onshore": "generation::Wind onshore",
+      "Photovoltaics": "generation::Photovoltaics",
+      "Photovoltaik": "generation::Photovoltaics",
+      "Other renewable": "generation::Other renewable",
+      "Sonstige Erneuerbare": "generation::Other renewable",
+      "Nuclear": "generation::Nuclear",
+      "Kernenergie": "generation::Nuclear",
+      "Lignite": "generation::Lignite",
+      "Braunkohle": "generation::Lignite",
+      "Hard coal": "generation::Hard coal",
+      "Steinkohle": "generation::Hard coal",
+      "Fossil gas": "generation::Fossil gas",
+      "Erdgas": "generation::Fossil gas",
+      "Hydro pumped storage": "generation::Hydro pumped storage",
+      "Pumpspeicher": "generation::Hydro pumped storage",
+      "Other conventional": "generation::Other conventional",
+      "Sonstige Konventionelle": "generation::Other conventional"
+    },
+    "consumption": {
+      "grid load": "consumption::grid load",
+      "Netzlast": "consumption::grid load",
+      "Residual load": "consumption::Residual load",
+      "Residuallast": "consumption::Residual load",
+      "Hydro pumped storage": "consumption::Hydro pumped storage",
+      "Pumpspeicher": "consumption::Hydro pumped storage"
+    },
+    "day_ahead_price": {
+      "Germany/Luxembourg": "day_ahead_price::Germany/Luxembourg",
+      "Deutschland/Luxemburg": "day_ahead_price::Germany/Luxembourg"
+    }
+  },
+  "series": {
+    "generation::Biomass": {
+      "dataset_key": "smard_generation_biomass",
+      "dataset_name": "Actual generation - Biomass",
+      "metric_type": "generation",
+      "energy_source": "biomass",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004066,
+      "active": true,
+      "description": "Realised net generation from biomass in Germany (SMARD module 1004066), MWh per interval."
+    },
+    "generation::Hydropower": {
+      "dataset_key": "smard_generation_hydro",
+      "dataset_name": "Actual generation - Hydropower",
+      "metric_type": "generation",
+      "energy_source": "hydro",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001226,
+      "active": true,
+      "description": "Realised net generation from hydropower in Germany (SMARD module 1001226), MWh per interval."
+    },
+    "generation::Wind offshore": {
+      "dataset_key": "smard_generation_wind_offshore",
+      "dataset_name": "Actual generation - Wind offshore",
+      "metric_type": "generation",
+      "energy_source": "wind_offshore",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001225,
+      "active": true,
+      "description": "Realised net generation from wind offshore in Germany (SMARD module 1001225), MWh per interval."
+    },
+    "generation::Wind onshore": {
+      "dataset_key": "smard_generation_wind_onshore",
+      "dataset_name": "Actual generation - Wind onshore",
+      "metric_type": "generation",
+      "energy_source": "wind_onshore",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004067,
+      "active": true,
+      "description": "Realised net generation from wind onshore in Germany (SMARD module 1004067), MWh per interval."
+    },
+    "generation::Photovoltaics": {
+      "dataset_key": "smard_generation_solar",
+      "dataset_name": "Actual generation - Photovoltaics",
+      "metric_type": "generation",
+      "energy_source": "solar",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004068,
+      "active": true,
+      "description": "Realised net generation from photovoltaics in Germany (SMARD module 1004068), MWh per interval."
+    },
+    "generation::Other renewable": {
+      "dataset_key": "smard_generation_other_renewable",
+      "dataset_name": "Actual generation - Other renewable",
+      "metric_type": "generation",
+      "energy_source": "other_renewable",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001228,
+      "active": true,
+      "description": "Realised net generation from other renewable in Germany (SMARD module 1001228), MWh per interval."
+    },
+    "generation::Nuclear": {
+      "dataset_key": "smard_generation_nuclear",
+      "dataset_name": "Actual generation - Nuclear",
+      "metric_type": "generation",
+      "energy_source": "nuclear",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001224,
+      "active": false,
+      "description": "Realised net generation from nuclear in Germany (SMARD module 1001224), MWh per interval.",
+      "note": "German nuclear plants were shut down on 15 Apr 2023; SMARD publishes '-' (no value). Excluded from default sync to avoid permanent false 'missing data' alerts."
+    },
+    "generation::Lignite": {
+      "dataset_key": "smard_generation_lignite",
+      "dataset_name": "Actual generation - Lignite",
+      "metric_type": "generation",
+      "energy_source": "lignite",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001223,
+      "active": true,
+      "description": "Realised net generation from lignite in Germany (SMARD module 1001223), MWh per interval."
+    },
+    "generation::Hard coal": {
+      "dataset_key": "smard_generation_hard_coal",
+      "dataset_name": "Actual generation - Hard coal",
+      "metric_type": "generation",
+      "energy_source": "hard_coal",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004069,
+      "active": true,
+      "description": "Realised net generation from hard coal in Germany (SMARD module 1004069), MWh per interval."
+    },
+    "generation::Fossil gas": {
+      "dataset_key": "smard_generation_fossil_gas",
+      "dataset_name": "Actual generation - Fossil gas",
+      "metric_type": "generation",
+      "energy_source": "fossil_gas",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004071,
+      "active": true,
+      "description": "Realised net generation from fossil gas in Germany (SMARD module 1004071), MWh per interval."
+    },
+    "generation::Hydro pumped storage": {
+      "dataset_key": "smard_generation_pumped_storage",
+      "dataset_name": "Actual generation - Hydro pumped storage",
+      "metric_type": "generation",
+      "energy_source": "pumped_storage",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1004070,
+      "active": true,
+      "description": "Realised net generation from hydro pumped storage in Germany (SMARD module 1004070), MWh per interval."
+    },
+    "generation::Other conventional": {
+      "dataset_key": "smard_generation_other_conventional",
+      "dataset_name": "Actual generation - Other conventional",
+      "metric_type": "generation",
+      "energy_source": "other_conventional",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 1001227,
+      "active": true,
+      "description": "Realised net generation from other conventional in Germany (SMARD module 1001227), MWh per interval."
+    },
+    "consumption::grid load": {
+      "dataset_key": "smard_consumption_grid_load",
+      "dataset_name": "Grid load (total consumption incl. losses)",
+      "metric_type": "consumption",
+      "energy_source": "total",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 5000410,
+      "active": true,
+      "description": "Grid load (total consumption incl. losses) (SMARD module 5000410), MWh per interval."
+    },
+    "consumption::Residual load": {
+      "dataset_key": "smard_residual_load",
+      "dataset_name": "Residual load (grid load minus wind & solar)",
+      "metric_type": "residual_load",
+      "energy_source": "total",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 5004359,
+      "active": true,
+      "description": "Residual load (grid load minus wind & solar) (SMARD module 5004359), MWh per interval."
+    },
+    "consumption::Hydro pumped storage": {
+      "dataset_key": "smard_consumption_pumped_storage",
+      "dataset_name": "Consumption of pumped-storage plants (pumping)",
+      "metric_type": "consumption",
+      "energy_source": "pumped_storage",
+      "unit": "MWh",
+      "frequency": "PT15M",
+      "module_id": 5004387,
+      "active": true,
+      "description": "Consumption of pumped-storage plants (pumping) (SMARD module 5004387), MWh per interval."
+    },
+    "day_ahead_price::Germany/Luxembourg": {
+      "dataset_key": "smard_day_ahead_price_de_lu",
+      "dataset_name": "Day-ahead price DE-LU",
+      "metric_type": "day_ahead_price",
+      "energy_source": "all",
+      "unit": "€/MWh",
+      "frequency": "PT15M",
+      "module_id": 8004169,
+      "active": true,
+      "description": "Day-ahead wholesale price for the DE-LU bidding zone (SMARD module 8004169). Quarter-hourly since the SDAC 15-minute MTU go-live (Oct 2025). Licensing of wholesale prices is under review by BNetzA."
+    }
+  },
+  "missing_value_tokens": [
+    "-",
+    ""
+  ],
+  "validation": {
+    "non_negative_metrics": [
+      "generation",
+      "consumption"
+    ],
+    "max_mw": {
+      "generation": 90000,
+      "consumption": 100000,
+      "residual_load": 100000
+    },
+    "price_range": [
+      -500,
+      5000
+    ]
+  }
+}

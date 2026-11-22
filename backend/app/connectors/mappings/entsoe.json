@@ -1,0 +1,256 @@
+{
+  "provider": "entsoe",
+  "country_code": "DE",
+  "areas": {
+    "DE-LU": {
+      "eic": "10Y1001A1001A82H",
+      "country_code": "DE"
+    }
+  },
+  "requests": {
+    "generation": {
+      "documentType": "A75",
+      "processType": "A16",
+      "area_param": "in_Domain",
+      "max_data_lag_minutes": 240
+    },
+    "load": {
+      "documentType": "A65",
+      "processType": "A16",
+      "area_param": "outBiddingZone_Domain",
+      "max_data_lag_minutes": 240
+    },
+    "day_ahead_price": {
+      "documentType": "A44",
+      "area_params": [
+        "in_Domain",
+        "out_Domain"
+      ],
+      "max_data_lag_minutes": 1440,
+      "publishes_ahead": true
+    }
+  },
+  "series": {
+    "A75::B01::in": {
+      "dataset_key": "entsoe_generation_biomass",
+      "dataset_name": "Actual generation per type - Biomass",
+      "metric_type": "generation",
+      "energy_source": "biomass",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B01",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B01 (Biomass), average MW."
+    },
+    "A75::B02::in": {
+      "dataset_key": "entsoe_generation_lignite",
+      "dataset_name": "Actual generation per type - Fossil Brown coal/Lignite",
+      "metric_type": "generation",
+      "energy_source": "lignite",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B02",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B02 (Fossil Brown coal/Lignite), average MW."
+    },
+    "A75::B04::in": {
+      "dataset_key": "entsoe_generation_fossil_gas",
+      "dataset_name": "Actual generation per type - Fossil Gas",
+      "metric_type": "generation",
+      "energy_source": "fossil_gas",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B04",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B04 (Fossil Gas), average MW."
+    },
+    "A75::B05::in": {
+      "dataset_key": "entsoe_generation_hard_coal",
+      "dataset_name": "Actual generation per type - Fossil Hard coal",
+      "metric_type": "generation",
+      "energy_source": "hard_coal",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B05",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B05 (Fossil Hard coal), average MW."
+    },
+    "A75::B06::in": {
+      "dataset_key": "entsoe_generation_oil",
+      "dataset_name": "Actual generation per type - Fossil Oil",
+      "metric_type": "generation",
+      "energy_source": "oil",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B06",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B06 (Fossil Oil), average MW."
+    },
+    "A75::B09::in": {
+      "dataset_key": "entsoe_generation_geothermal",
+      "dataset_name": "Actual generation per type - Geothermal",
+      "metric_type": "generation",
+      "energy_source": "geothermal",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B09",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B09 (Geothermal), average MW."
+    },
+    "A75::B10::in": {
+      "dataset_key": "entsoe_generation_pumped_storage",
+      "dataset_name": "Actual generation per type - Hydro Pumped Storage",
+      "metric_type": "generation",
+      "energy_source": "pumped_storage",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B10",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B10 (Hydro Pumped Storage), average MW."
+    },
+    "A75::B11::in": {
+      "dataset_key": "entsoe_generation_hydro_run_of_river",
+      "dataset_name": "Actual generation per type - Hydro Run-of-river and poundage",
+      "metric_type": "generation",
+      "energy_source": "hydro_run_of_river",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B11",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B11 (Hydro Run-of-river and poundage), average MW."
+    },
+    "A75::B12::in": {
+      "dataset_key": "entsoe_generation_hydro_reservoir",
+      "dataset_name": "Actual generation per type - Hydro Water Reservoir",
+      "metric_type": "generation",
+      "energy_source": "hydro_reservoir",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B12",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B12 (Hydro Water Reservoir), average MW."
+    },
+    "A75::B14::in": {
+      "dataset_key": "entsoe_generation_nuclear",
+      "dataset_name": "Actual generation per type - Nuclear",
+      "metric_type": "generation",
+      "energy_source": "nuclear",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B14",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B14 (Nuclear), average MW."
+    },
+    "A75::B15::in": {
+      "dataset_key": "entsoe_generation_other_renewable",
+      "dataset_name": "Actual generation per type - Other renewable",
+      "metric_type": "generation",
+      "energy_source": "other_renewable",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B15",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B15 (Other renewable), average MW."
+    },
+    "A75::B16::in": {
+      "dataset_key": "entsoe_generation_solar",
+      "dataset_name": "Actual generation per type - Solar",
+      "metric_type": "generation",
+      "energy_source": "solar",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B16",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B16 (Solar), average MW."
+    },
+    "A75::B17::in": {
+      "dataset_key": "entsoe_generation_waste",
+      "dataset_name": "Actual generation per type - Waste",
+      "metric_type": "generation",
+      "energy_source": "waste",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B17",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B17 (Waste), average MW."
+    },
+    "A75::B18::in": {
+      "dataset_key": "entsoe_generation_wind_offshore",
+      "dataset_name": "Actual generation per type - Wind Offshore",
+      "metric_type": "generation",
+      "energy_source": "wind_offshore",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B18",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B18 (Wind Offshore), average MW."
+    },
+    "A75::B19::in": {
+      "dataset_key": "entsoe_generation_wind_onshore",
+      "dataset_name": "Actual generation per type - Wind Onshore",
+      "metric_type": "generation",
+      "energy_source": "wind_onshore",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B19",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B19 (Wind Onshore), average MW."
+    },
+    "A75::B20::in": {
+      "dataset_key": "entsoe_generation_other_conventional",
+      "dataset_name": "Actual generation per type - Other",
+      "metric_type": "generation",
+      "energy_source": "other_conventional",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B20",
+      "active": true,
+      "description": "ENTSO-E 16.1.B&C Actual Generation per Production Type, psrType B20 (Other), average MW."
+    },
+    "A75::B10::out": {
+      "dataset_key": "entsoe_consumption_pumped_storage",
+      "dataset_name": "Pumped storage consumption (ENTSO-E A75 out)",
+      "metric_type": "consumption",
+      "energy_source": "pumped_storage",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "psr_type": "B10",
+      "active": true,
+      "description": "A75 time series flagged with outBiddingZone_Domain: energy consumed by pumped-storage plants. Must NOT be added to generation."
+    },
+    "A65::total": {
+      "dataset_key": "entsoe_actual_total_load",
+      "dataset_name": "Actual total load",
+      "metric_type": "consumption",
+      "energy_source": "total",
+      "unit": "MAW",
+      "frequency": "PT15M",
+      "active": true,
+      "description": "ENTSO-E 6.1.A Actual Total Load, average MW. Definition differs from SMARD 'grid load' (e.g. treatment of losses/self-consumption) - compare with care."
+    },
+    "A44::price": {
+      "dataset_key": "entsoe_day_ahead_price",
+      "dataset_name": "Day-ahead prices",
+      "metric_type": "day_ahead_price",
+      "energy_source": "all",
+      "unit": "EUR/MWh",
+      "frequency": "PT15M",
+      "active": true,
+      "description": "ENTSO-E 12.1.D Day-ahead prices for the bidding zone."
+    }
+  },
+  "validation": {
+    "non_negative_metrics": [
+      "generation",
+      "consumption"
+    ],
+    "max_mw": {
+      "generation": 90000,
+      "consumption": 100000
+    },
+    "price_range": [
+      -500,
+      5000
+    ]
+  }
+}
