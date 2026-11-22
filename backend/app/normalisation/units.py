@@ -18,6 +18,7 @@ CANONICAL_UNIT_BY_METRIC = {
     "generation": "MW",
     "consumption": "MW",
     "residual_load": "MW",
+    "asset_production": "MW",
     "day_ahead_price": "EUR/MWh",
 }
 

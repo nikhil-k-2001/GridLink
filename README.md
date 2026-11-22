@@ -1,22 +1,36 @@
-# GridLink
+# GridLink — Market Connections Workspace
 
-**Connect, standardise, validate and monitor energy data from multiple European markets.**
+**Make the data customers need accessible, reliable and usable — across European energy markets.**
 
-GridLink is a lightweight energy-data integration workspace. It is not an analytics dashboard: it shows the work
-*behind* the numbers — investigating providers, connecting to them, normalising different formats, validating quality,
-monitoring connector health and deciding which integration to build next. Germany is the first market; the connector
-architecture is built for more.
+GridLink is a working model of the job of a **Technical Product Manager for market connections** at a
+renewable-asset-management SaaS. It starts where that job starts — *customers' plants and the data they
+need* — and follows the work through: mapping how data can be accessed in each country, chasing providers,
+testing APIs, building reusable connectors with engineering, catching data issues before customers do, and
+turning each connection into a playbook that makes the next one faster.
+
+> **Start here:** [How GridLink maps to the role](docs/role-mapping.md) ·
+> [5-minute demo script](docs/demo-script.md) · [First 90 days plan](docs/first-90-days.md)
 
 | What | Status |
 |---|---|
-| SMARD (Bundesnetzagentur) — generation by source, grid load, residual load, DE-LU day-ahead prices | **Real data**, live public CSV download, 15-min resolution |
-| ENTSO-E Transparency Platform — A75 generation, A65 load, A44 prices | Connector built and tested; **live calls need your own token** |
-| ENTSO-E simulated fixtures | Synthetic XML through the real parser, labelled **SIMULATED** everywhere |
+| SMARD (Bundesnetzagentur) — German generation, load, DE-LU day-ahead prices | **Real data**, public CSV download |
+| ENTSO-E Transparency Platform — prices for FR/ES/IT/NL | Connector built & tested; **live calls need your own token** |
+| Customers, plants, plant-level DSO metering (France, Spain) | **Fictional / simulated**, labelled everywhere |
+| Facts about real organisations (Enedis, Datadis, e-distribuzione, MaStR, ENTSO-E…) | Each tagged *verified* / *researched* (with URL) / *assumption* |
 
-> GridLink never fabricates credentials or reports a connection that does not exist. Without `ENTSOE_API_TOKEN` the live
-> ENTSO-E connector is shown as **Failed — awaiting credentials**.
+> GridLink never fabricates credentials or claims a connection that doesn't exist. Without `ENTSOE_API_TOKEN`
+> the live ENTSO-E connector shows **Failed — awaiting credentials**.
 
----
+### The workflow it models
+
+```
+Customers & plants ─► Coverage gaps ─► Prioritisation ─► Country access map ─► Relationships & access requests
+        ▲                                                                              │
+        │                                                                              ▼
+  Data issues ◄── Quality & health ◄── Connector (shared pipeline) ◄── Integration spec ◄── API test bench
+        │
+        └──► Lessons learned & country playbook (the next country is faster)
+```
 
 ## Quick start
 
@@ -25,7 +39,7 @@ Prerequisites: Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 
 ```bash
 make db                 # PostgreSQL 16 on localhost:5434 (docker compose)
 cp backend/.env.example backend/.env
-make backend-install migrate seed
+make backend-install migrate seed    # `python -m app.seed --reset` rebuilds the demo workspace
 make api                # http://localhost:8000  (OpenAPI: /docs)
 ```
 
@@ -36,8 +50,9 @@ cp frontend/.env.example frontend/.env.local
 make frontend-install web   # http://localhost:3000
 ```
 
-Then open **Connectors** and press **Sync** on each connector (or `curl -X POST localhost:8000/connectors/1/sync`).
-The SMARD sync downloads the last 7 days of real data (~10k records) in a few seconds.
+Then open **Connectors** and press **Sync** on each connector (or `curl -X POST localhost:8000/connectors/{id}/sync`).
+The SMARD sync downloads the last 7 days of real data (~10k records) in a few seconds; the two simulated DSO
+connectors fetch plant data and raise the planted data issues (gap, revoked consent, estimated values, duplicates).
 
 Without `make`: see the commands inside the [`Makefile`](Makefile).
 
@@ -53,18 +68,22 @@ Without `make`: see the commands inside the [`Makefile`](Makefile).
 
 ## Modules
 
-| Module | Where | What it demonstrates |
+| Area | Page | What it does |
 |---|---|---|
-| **Provider discovery** | `/providers` | Directory with status workflow (Discovered → … → Connected / Blocked), owner, next action, and an **evidence register** separating *verified*, *researched* and *assumption* facts |
-| **Connector management** | `/connectors` | One contract for all providers, manual sync, sync history, error log, raw payload audit trail, missing-data periods |
-| **Data quality monitoring** | `/quality` | Report per ingestion across completeness, consistency, freshness, validity and reliability |
-| **Energy data explorer** | `/explorer` | Generation mix, solar & wind, consumption, residual load, prices — with provenance and comparability warnings |
-| **Connection prioritisation** | `/prioritisation` | Transparent, editable scoring model, ranking, comparison and documented decisions |
-| **Provider documentation** | `/documentation` | 15-section onboarding template, Markdown/CSV export |
+| This week | **Cockpit** `/` | Coverage, overdue follow-ups, data issues by customer impact, biggest gaps, access lead time |
+| Demand | **Customers & plants** `/coverage` | Every plant × data need with one status, a reason and a next step; rollups per customer and country |
+| Demand | **Prioritisation** `/prioritisation` | Transparent, editable scoring; customer value backed by live demand (plants, MW, customers waiting) |
+| Access | **Country access maps** `/countries` | Market actors, routes per data need with fallbacks and blockers, 10-step playbook, lessons learned |
+| Access | **Providers** `/providers` | Directory with status workflow and an evidence register (verified / researched / assumption) |
+| Access | **Relationships** `/relationships` | Access requests, interaction log, follow-ups (overdue first), contacts by role |
+| Access | **API test bench** `/api-bench` | Allow-listed real and simulated API calls, redacted evidence, promote results to verified facts |
+| Access | **Onboarding docs** `/documentation` | 15-section integration spec per provider, Markdown/CSV export |
+| Data | **Connectors** `/connectors` | One contract for all providers; sync history, errors, raw payloads, missing periods |
+| Data | **Data quality** `/quality` | Completeness, consistency, freshness, validity and reliability after every sync |
+| Data | **Data issues** `/issues` | Auto-raised issues with affected customers/MW, hypotheses, root cause, customer update, resolution |
+| Data | **Energy explorer** `/explorer` | Normalised market data with provenance and comparability warnings |
 
 Example exported reports: [SMARD](docs/providers/smard-onboarding-report.md) · [ENTSO-E](docs/providers/entsoe-onboarding-report.md)
-
----
 
 ## Architecture
 
@@ -84,7 +103,8 @@ backend/
   app/api/               FastAPI routers
   alembic/               migrations
   fixtures/              SIMULATED ENTSO-E XML (generated by scripts/generate_entsoe_fixtures.py)
-  tests/                 80 tests + provider failure fixtures
+  app/simulated/         fictional portfolio + simulated DSO platforms (also served at /simulated/...)
+  tests/                 100 tests + provider failure fixtures
 frontend/                Next.js 16 · TypeScript strict · Tailwind · shadcn/ui · Recharts · Lucide
 docs/                    architecture, API reference, OpenAPI spec, onboarding reports
 ```
@@ -122,7 +142,7 @@ on 2026-11-20 most DE-LU quarter-hour prices were published as `-`; SMARD revise
 ## Testing
 
 ```bash
-cd backend && uv run pytest        # 80 tests, SQLite in-memory, no network
+cd backend && uv run pytest        # 100 tests, SQLite in-memory, no network
 cd frontend && npx tsc --noEmit && npm run lint && npm run build
 ```
 
@@ -152,6 +172,7 @@ Local development needs no paid service. For a hosted deployment:
 
 ## Known limitations / next steps
 
+* Plant-level data comes from simulated DSO platforms; going live means a provider contract (e.g. Enedis) and owner consent per plant.
 * No authentication or roles in the web app ("administrators" = anyone with access). Add SSO before sharing.
 * Sync runs synchronously inside the request (seconds for SMARD). Large backfills should move to a job queue.
 * ENTSO-E has only been exercised against fixtures and mocked HTTP; the first live sync with a real token must be

@@ -82,6 +82,7 @@ export interface Summary {
 
 export interface Opportunity {
   id: number; provider_id: number; provider_name: string | null; country_code: string | null; title: string;
+  data_need: string | null; demand: { plants: number; capacity_mw: number; customers: string[]; suggested_customer_value: number } | null;
   customer_value: number; data_importance: number; commercial_opportunity: number; strategic_relevance: number;
   technical_effort: number; access_complexity: number; estimated_weeks: number | null; priority_score: number; rank: number | null;
   rationale: string | null; decision_status: string; decision_notes: string | null; created_at: string; updated_at: string;
@@ -106,3 +107,66 @@ export interface Overview {
     records_failed: number; error_code: string | null }[];
   generated_at: string;
 }
+
+// ---------------------------------------------------------------- market-connections workflow
+export type DataNeed = "production_metering" | "day_ahead_price" | "plant_master_data";
+export const NEED_LABEL: Record<string, string> = {
+  production_metering: "Plant metering", day_ahead_price: "Day-ahead price", plant_master_data: "Plant master data",
+};
+export interface RouteRef { id: number; holder: string; route_type: string; status: string; is_fallback: boolean; blockers: string | null }
+export interface NeedCoverage { need: DataNeed; status: string; reason: string; route: RouteRef | null; latest: string | null;
+  data_origin: string | null; authorisation?: string | null }
+export interface PlantCoverage { asset_id: number; name: string; customer_id: number; customer: string; country_code: string;
+  bidding_zone: string; technology: string; capacity_mw: number; metering_point_id: string | null; dso: string | null;
+  is_fictional: boolean; needs: NeedCoverage[] }
+export interface Rollup { pairs: number; covered: number; in_progress: number; gaps: number; pct: number | null; mw_pct: number | null }
+export interface Coverage { computed_at: string; assets: PlantCoverage[]; totals: Rollup & { plants: number; capacity_mw: number };
+  by_need: Record<string, Rollup>; by_country: Record<string, Rollup>; by_customer: Record<string, Rollup>; status_counts: Record<string, number> }
+export interface Demand { plants: number; capacity_mw: number; customers: string[]; suggested_customer_value: number }
+
+export interface FollowUp { request_id: number; provider_id: number; provider: string; country_code: string; subject: string;
+  status: string; owner: string | null; last_contact: string | null; days_since_contact: number | null; next_follow_up: string | null;
+  due_date: string | null; overdue: boolean; days_open: number }
+export interface Issue { id: number; title: string; code: string; status: string; severity: "low" | "medium" | "high"; source: string;
+  connector_id: number | null; connector: string | null; provider_id: number | null; provider: string | null; sync_log_id: number | null;
+  detected_at: string; resolved_at: string | null; affected_asset_ids: number[]; period_start: string | null; period_end: string | null;
+  evidence: Record<string, unknown>; hypotheses: string | null; root_cause: string | null; provider_contacted: boolean;
+  customer_update: string | null; resolution: string | null; updated_at: string;
+  affected_assets: { id: number; name: string; customer: string; capacity_mw: number }[]; affected_customers: string[]; affected_mw: number }
+export interface Cockpit {
+  generated_at: string; coverage: Coverage["totals"]; by_need: Record<string, Rollup>; by_country: Record<string, Rollup>;
+  biggest_gaps: { country_code: string; need: string; plants: number; capacity_mw: number; customers: string[] }[];
+  follow_ups: { overdue: FollowUp[]; upcoming: FollowUp[] };
+  issues: { open: number; high: number; top: Issue[] };
+  authorisations_pending: { asset: string; customer: string; country_code: string; status: string }[];
+  connectors: { id: number; name: string; status: HealthStatus; data_origin: string; reason: string | null }[];
+  lead_times: LeadTimes; demand_for: Record<string, Demand>;
+}
+export interface LeadTimes { median_days_to_grant: number | null; samples: number; by_country: Record<string, { median_days: number; samples: number }> }
+export interface CountrySummary { country_code: string; name: string; status: string; owner: string | null; bidding_zones: string[];
+  plants: number; capacity_mw: number; customers: string[]; coverage: Rollup | null; routes: Record<string, number>;
+  open_requests: number; playbook: { done: number; total: number; pct: number; blocked: number } }
+export interface AccessRoute { id: number; country_code: string; data_need: DataNeed; provider_id: number | null; provider: string | null;
+  holder_name: string; route_type: string; status: string; is_fallback: boolean; effort: string | null;
+  requires_owner_authorisation: boolean; blockers: string | null; notes: string | null; evidence_level: EvidenceLevel; source_url: string | null }
+export interface PlaybookItem { key: string; title: string; description: string; number: number; status: string; notes?: string | null;
+  started_at?: string | null; completed_at?: string | null }
+export interface AccessRequest { id: number; provider_id: number; provider: string; country_code: string; data_need: DataNeed; subject: string;
+  status: string; owner: string | null; opened_at: string; due_date: string | null; closed_at: string | null;
+  fallback_route_id: number | null; notes: string | null; interactions?: number }
+export interface CountryDetail {
+  profile: { country_code: string; name: string; bidding_zones: string[]; tso: string | null; market_operator: string | null;
+    dso_landscape: string | null; status: string; owner: string | null; summary: string | null; lessons_learned: string | null;
+    languages: string[]; updated_at: string };
+  routes: AccessRoute[]; playbook: PlaybookItem[]; playbook_progress: CountrySummary["playbook"];
+  providers: { id: number; name: string; status: string }[]; requests: AccessRequest[]; plants: PlantCoverage[];
+  coverage: Rollup | null; lead_times: { median_days: number; samples: number } | null;
+}
+export interface Contact { id: number; provider_id: number; provider: string; role: string; name: string | null; email: string | null;
+  language: string | null; notes: string | null; is_placeholder: boolean }
+export interface Interaction { id: number; provider_id: number; provider: string; access_request_id: number | null; contact_id: number | null;
+  contact: string | null; occurred_at: string; channel: string; direction: "inbound" | "outbound"; summary: string; next_follow_up: string | null }
+export interface ApiTest { id: number; provider_id: number | null; provider: string | null; name: string; method: string; url: string;
+  params: Record<string, string>; request_headers: Record<string, string>; request_body: string | null; status_code: number | null;
+  duration_ms: number | null; content_type: string | null; response_headers: Record<string, string>; response_excerpt: string | null;
+  response_size: number | null; error: string | null; verdict: string; notes: string | null; created_at: string }

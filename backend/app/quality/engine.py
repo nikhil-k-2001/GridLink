@@ -20,6 +20,7 @@ EUROPEAN_COUNTRY_CODES = set(
     "SE SI SK TR UA XK EU".split()
 )
 ALLOWED_SOURCES_BY_METRIC = {
+    "asset_production": {"solar", "wind_onshore", "wind_offshore"},
     "consumption": {"total", "pumped_storage"},
     "residual_load": {"total"},
     "day_ahead_price": {"all"},
@@ -53,6 +54,7 @@ class ValidationResult:
     duplicate_count: int = 0
     conflicting_duplicates: int = 0
     null_count: int = 0
+    estimated_count: int = 0
     series: list[SeriesQuality] = field(default_factory=list)
     checks: dict[str, Any] = field(default_factory=dict)
 
@@ -96,7 +98,8 @@ def _ceil(dt: datetime, minutes: int) -> datetime:
     return f if f == dt else f + timedelta(minutes=minutes)
 
 
-def _record_problems(r: NormalisedRecord, rules: dict[str, Any], now: datetime, publishes_ahead: bool) -> list[tuple[str, str]]:
+def _record_problems(r: NormalisedRecord, rules: dict[str, Any], now: datetime, publishes_ahead: bool,
+                     spec: dict[str, Any] | None = None) -> list[tuple[str, str]]:
     problems: list[tuple[str, str]] = []
     # validity
     if r.timestamp_utc < EARLIEST_PLAUSIBLE:
@@ -109,9 +112,9 @@ def _record_problems(r: NormalisedRecord, rules: dict[str, Any], now: datetime, 
     if r.value is not None:
         if r.metric_type in rules.get("non_negative_metrics", []) and r.value < 0:
             problems.append(("negative_value", f"Negative {r.metric_type} value {r.value:g} {r.unit}"))
-        max_mw = rules.get("max_mw", {}).get(r.metric_type)
+        max_mw = (spec or {}).get("max_value", rules.get("max_mw", {}).get(r.metric_type))
         if max_mw is not None and r.value > max_mw:
-            problems.append(("out_of_range", f"{r.value:g} MW exceeds plausible maximum {max_mw} MW"))
+            problems.append(("out_of_range", f"{r.value:g} MW exceeds plausible maximum {max_mw:g} MW"))
         if r.metric_type == "day_ahead_price":
             lo, hi = rules.get("price_range", [-500, 5000])
             if not lo <= r.value <= hi:
@@ -161,6 +164,7 @@ def validate_batch(
     out = ValidationResult()
 
     seen_ids: dict[str, NormalisedRecord] = {}
+    # logical key = same series, same interval (different source ids for the same reading = duplicate)
     seen_logical: dict[tuple[str, datetime, int], str] = {}
     problem_counts: Counter[str] = Counter()
 
@@ -174,11 +178,11 @@ def validate_batch(
                                         f"{r.source_record_id} delivered twice with different values",
                                         context={"first": seen_ids[r.source_record_id].original_value, "second": r.original_value}))
             continue
-        logical = (r.dataset_key, r.timestamp_utc, r.interval_minutes)
+        logical = (r.series_key, r.timestamp_utc, r.interval_minutes)
         if logical in seen_logical:
             out.duplicate_count += 1
             continue
-        problems = _record_problems(r, rules, now, r.series_key in publishes_ahead_series)
+        problems = _record_problems(r, rules, now, r.series_key in publishes_ahead_series, mapping["series"].get(r.series_key))
         if problems:
             out.invalid_count += 1
             for code, msg in problems:
@@ -192,6 +196,8 @@ def validate_batch(
         seen_logical[logical] = r.source_record_id
         if r.value is None:
             out.null_count += 1
+        if "estimated" in r.flags:
+            out.estimated_count += 1
         out.valid.append(r)
 
     # completeness + freshness per series
@@ -203,7 +209,7 @@ def validate_batch(
         recs = by_series.get(key, [])
         spec = mapping["series"].get(key, {})
         minutes = Counter(r.interval_minutes for r in recs).most_common(1)[0][0] if recs else \
-            {"PT15M": 15, "PT60M": 60, "P1D": 1440}.get(spec.get("frequency", "PT15M"), 15)
+            {"PT15M": 15, "PT30M": 30, "PT60M": 60, "PT1H": 60, "P1D": 1440}.get(spec.get("frequency", "PT15M"), 15)
         lag = lag_by_series.get(key, expected_lag_minutes)
         ahead = key in publishes_ahead_series
         effective_end = window_end if ahead else min(window_end, now - timedelta(minutes=lag))
@@ -253,6 +259,7 @@ def validate_batch(
             "unmapped_series": normalised.unmapped_series,
         },
         "validity": {
+            "estimated_values": out.estimated_count,
             "invalid_records": out.invalid_count,
             "rejected_in_normalisation": normalised.rejected,
             "by_rule": dict(problem_counts),

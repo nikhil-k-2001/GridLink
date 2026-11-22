@@ -64,6 +64,7 @@ class SourceRecord:
     payload_index: int = 0
     location: str | None = None  # row / XML path for audit
     parse_error: str | None = None
+    flags: tuple[str, ...] = ()  # provider quality flags, e.g. ("estimated",)
 
 
 @dataclass
@@ -93,6 +94,15 @@ class BaseConnector(ABC):
     provider_slug: ClassVar[str]
     mapping_name: ClassVar[str]
     data_origin: ClassVar[str] = "real"
+
+    @classmethod
+    def default_transport(cls):
+        """Transport override (simulated providers are served in-process). None = real network."""
+        return None
+
+    def prepare(self, db, connector_row) -> None:
+        """Hook to load context from the database (e.g. plants and authorisations) before a sync."""
+        return None
 
     def __init__(self, config: dict[str, Any], settings: Settings, http: RetryingClient | None = None):
         self.config = config or {}
@@ -181,7 +191,7 @@ def register(cls: type[BaseConnector]) -> type[BaseConnector]:
 
 def get_connector_class(connector_type: str) -> type[BaseConnector]:
     # Import side effect registers built-in connectors.
-    from app.connectors import entsoe, smard  # noqa: F401
+    from app.connectors import dso_sim, entsoe, smard  # noqa: F401
 
     try:
         return CONNECTOR_REGISTRY[connector_type]

@@ -12,11 +12,16 @@ DISCLAIMER = ("Priority scores are a product-planning framework based on the tea
 
 
 def _ranked(db, items):
+    from app.services.coverage import compute_coverage, demand
+
+    cov = compute_coverage(db) if any(o.country_code or o.data_need for o in items) else None
     ordered = sorted(items, key=lambda o: o.priority_score, reverse=True)
     out = []
     for rank, o in enumerate(ordered, start=1):
         m = OpportunityOut.model_validate(o)
-        m.provider_name, m.country_code, m.rank = o.provider.name, o.provider.country_code, rank
+        m.provider_name, m.country_code, m.rank = o.provider.name, o.country_code or o.provider.country_code, rank
+        if cov and (o.country_code or o.data_need):
+            m.demand = demand(cov, o.country_code, o.data_need)
         out.append(m)
     return out
 

@@ -1,0 +1,19 @@
+{
+  "provider": "datadis",
+  "country_code": "ES",
+  "source_timezone": "Europe/Madrid",
+  "published_unit": "kWh",
+  "frequency": "PT60M",
+  "note": "SIMULATED platform. Series are generated per plant at sync time from the plants served by this data holder.",
+  "series": {},
+  "requests": {
+    "production": {
+      "max_data_lag_minutes": 2880
+    }
+  },
+  "validation": {
+    "non_negative_metrics": [
+      "asset_production"
+    ]
+  }
+}

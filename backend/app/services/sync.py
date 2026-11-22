@@ -86,6 +86,15 @@ def build_http_client(connector_type: str, settings: Settings, transport: httpx.
     )
 
 
+def _failure_issue(db: Session, connector: Connector, sync_log: SyncLog) -> None:
+    from app.services.issues import raise_sync_failure_issue
+
+    try:
+        raise_sync_failure_issue(db, connector, sync_log)
+    except Exception:  # issue tracking must never mask the original failure
+        log.exception("could not record sync failure issue")
+
+
 def run_sync(
     db: Session,
     connector_id: int,
@@ -111,13 +120,21 @@ def run_sync(
     db.add(sync_log)
     db.commit()
     issue_counter = [0]
+    try:
+        cls = get_connector_class(connector.connector_type)
+    except ValueError:
+        cls = None
+    if transport is None and cls is not None:
+        transport = cls.default_transport()
     http = build_http_client(connector.connector_type, settings, transport, sleep)
     extra = {"connector_id": connector.id, "sync_id": sync_log.id, "connector_type": connector.connector_type}
     log.info("sync started", extra={**extra, "window_start": ws.isoformat(), "window_end": we.isoformat()})
 
     try:
-        cls = get_connector_class(connector.connector_type)
+        if cls is None:
+            raise ConnectorError("internal", "unknown_connector_type", f"Unknown connector type {connector.connector_type}")
         impl = cls(connector.config or {}, settings, http)
+        impl.prepare(db, connector)
 
         auth = impl.authenticate()
         sync_log.details = {**sync_log.details, "auth": {"ok": auth.ok, "method": auth.method, "message": auth.message}}
@@ -140,13 +157,14 @@ def run_sync(
         db.commit()  # raw data is durable before any transformation
         raw_ids = {i: r.id for i, r in raw_rows.items()}
 
-        records, parse_failures = [], 0
+        records, parse_failures, provider_issues = [], 0, []
         for idx, p in enumerate(payloads):
             try:
                 parsed = impl.parse_response(p, idx)
                 records.extend(parsed.records)
                 for issue in parsed.issues:
                     _record_issue(db, sync_log, issue, issue_counter)
+                provider_issues.extend(parsed.issues)
                 raw_rows[idx].outcome = "parsed"
             except ConnectorError as exc:
                 parse_failures += 1
@@ -172,7 +190,7 @@ def run_sync(
             sync_log.status = "failed"
             sync_log.error_code = "all_payloads_unparseable"
             sync_log.error_message = "Every payload failed to parse; see sync errors"
-        elif parse_failures or failed_records:
+        elif parse_failures or failed_records or any(i.severity == "error" for i in provider_issues):
             sync_log.status = "partial"
         else:
             sync_log.status = "success"
@@ -198,6 +216,10 @@ def run_sync(
             created_at=datetime.now(UTC),
         )
         db.add(report)
+        db.flush()
+        from app.services.issues import raise_issues_from_sync
+
+        raise_issues_from_sync(db, connector, sync_log, impl, validation, provider_issues, now)
         if sync_log.status == "failed":
             connector.last_failed_sync = datetime.now(UTC)
         else:
@@ -212,6 +234,7 @@ def run_sync(
         _record_issue(db, sync_log, Issue(exc.stage, exc.code, exc.message, context={"http_status": exc.http_status}),
                       issue_counter)
         connector.last_failed_sync = datetime.now(UTC)
+        _failure_issue(db, connector, sync_log)
         log.warning("sync failed", extra={**extra, "code": exc.code, "error": exc.message})
     except Exception as exc:  # unexpected: record it, never swallow silently
         db.rollback()
@@ -221,6 +244,7 @@ def run_sync(
         sync_log.error_message = f"{type(exc).__name__}: {exc}"
         _record_issue(db, sync_log, Issue("internal", "internal_error", sync_log.error_message), issue_counter)
         connector.last_failed_sync = datetime.now(UTC)
+        _failure_issue(db, connector, sync_log)
         log.exception("sync crashed", extra=extra)
     finally:
         sync_log.requests_made = http.stats.requests

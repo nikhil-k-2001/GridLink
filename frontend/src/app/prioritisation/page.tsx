@@ -55,7 +55,7 @@ export default function PrioritisationPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Connection prioritisation"
-        description="Rank potential provider integrations with a transparent, editable model. Change any score and the ranking updates immediately."
+        description="Rank integrations with a transparent, editable model. Customer value is backed by live demand: how many customer plants and MW are waiting for this data."
         actions={<Button onClick={() => setAdding(true)}><Plus />Add opportunity</Button>} />
 
       <div className="flex items-start gap-2 rounded-xl border bg-muted/50 p-3 text-sm">
@@ -93,7 +93,11 @@ export default function PrioritisationPage() {
                     <input type="checkbox" aria-label={`Compare ${o.title}`} checked={compare.includes(o.id)}
                       onChange={(e) => setCompare(e.target.checked ? [...compare, o.id] : compare.filter((x) => x !== o.id))} /></TableCell>
                   <TableCell className="font-semibold tabular-nums">{o.rank}</TableCell>
-                  <TableCell><div className="font-medium">{o.title}</div><div className="text-xs text-muted-foreground">{o.provider_name} · {o.country_code}</div></TableCell>
+                  <TableCell className="min-w-64 whitespace-normal"><div className="font-medium">{o.title}</div><div className="text-xs text-muted-foreground">{o.provider_name}{o.country_code ? ` · ${o.country_code}` : " · all markets"}</div>
+                    {o.demand && <div className="mt-0.5 text-xs">
+                      <span className="text-muted-foreground">Waiting: {o.demand.plants} plants · {fmtNum(o.demand.capacity_mw, 1)} MW · {o.demand.customers.length} customer{o.demand.customers.length === 1 ? "" : "s"}</span>
+                      {o.demand.suggested_customer_value !== o.customer_value && <span className="ml-1.5 rounded bg-amber-100 px-1 text-amber-900 dark:bg-amber-950 dark:text-amber-200" title="Suggested from uncovered MW and number of customers">demand suggests CV {o.demand.suggested_customer_value}</span>}
+                    </div>}</TableCell>
                   {FACTORS.map(([k]) => (
                     <TableCell key={k} className="text-center" onClick={(e) => e.stopPropagation()}>
                       <NativeSelect aria-label={humanise(k)} value={o[k as FactorKey]} className="h-7 w-12 px-1 text-center"

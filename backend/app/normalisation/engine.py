@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from app.connectors.base import Issue, SourceRecord
 from app.normalisation.units import UnitConversionError, convert, normalise_unit_label
 
-METRIC_TYPES = {"generation", "consumption", "residual_load", "day_ahead_price"}
+METRIC_TYPES = {"generation", "consumption", "residual_load", "day_ahead_price", "asset_production"}
 ENERGY_SOURCES = {
     "biomass", "hydro", "wind_offshore", "wind_onshore", "solar", "other_renewable", "nuclear", "lignite",
     "hard_coal", "fossil_gas", "pumped_storage", "other_conventional", "oil", "geothermal", "waste",
@@ -48,6 +48,8 @@ class NormalisedRecord(BaseModel):
     data_origin: str = Field(pattern=r"^(real|simulated)$")
     payload_index: int = 0
     location: str | None = None
+    asset_id: int | None = None
+    flags: tuple[str, ...] = ()
     ingestion_timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("timestamp_utc")
@@ -165,6 +167,8 @@ def normalise_records(
                     data_origin=data_origin,
                     payload_index=rec.payload_index,
                     location=rec.location,
+                    asset_id=spec.get("asset_id"),
+                    flags=rec.flags,
                 )
             )
         except ValidationError as exc:

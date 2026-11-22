@@ -11,9 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from app.db import session_factory
-from app.models import Connector, IntegrationOpportunity, Provider, ProviderFact, ProviderInvestigation
-from app.schemas import PrioritisationWeights
-from app.services.prioritisation import priority_score
+from app.models import Connector, Provider, ProviderFact, ProviderInvestigation
 
 CHECKED = datetime(2026, 11, 21, tzinfo=UTC)
 
@@ -206,21 +204,6 @@ INVESTIGATIONS = {
     },
 }
 
-OPPORTUNITIES = [
-    ("entsoe", "ENTSO-E live DE-LU generation, load & prices", 5, 5, 5, 4, 3, 3, 2,
-     "Unlocks every EU bidding zone through one connector; already built against fixtures."),
-    ("netztransparenz", "German TSO renewable forecasts", 4, 4, 3, 3, 3, 3, 2,
-     "Complements SMARD actuals with forecasts; OAuth registration adds access effort."),
-    ("energinet", "Denmark production & spot prices", 3, 3, 3, 2, 2, 1, 1,
-     "Open API, low effort; DK wind share makes it a good validation market."),
-    ("rte-eco2mix", "France generation mix", 4, 4, 4, 4, 3, 2, 2,
-     "Large market, strategic for cross-border comparisons; two API families to choose between."),
-    ("elexon-bmrs", "GB fuel mix & demand", 3, 3, 2, 3, 3, 2, 2,
-     "Commercially interesting but outside SDAC; different market design reduces comparability."),
-    ("fingrid", "Finland production & consumption", 2, 3, 2, 2, 2, 2, 1, "Small market; easy access with API key."),
-]
-
-
 def seed() -> None:
     with session_factory()() as db:
         by_slug = {p.slug: p for p in db.scalars(select(Provider))}
@@ -258,18 +241,26 @@ def seed() -> None:
             if not db.scalar(select(ProviderInvestigation).where(ProviderInvestigation.provider_id == p.id)):
                 db.add(ProviderInvestigation(provider_id=p.id, **fields))
 
-        if not db.scalar(select(IntegrationOpportunity)):
-            weights = PrioritisationWeights()
-            for slug, title, cv, di, co, sr, te, ac, weeks, why in OPPORTUNITIES:
-                o = IntegrationOpportunity(provider_id=by_slug[slug].id, title=title, customer_value=cv,
-                                           data_importance=di, commercial_opportunity=co, strategic_relevance=sr,
-                                           technical_effort=te, access_complexity=ac, estimated_weeks=weeks,
-                                           rationale=why)
-                o.priority_score = priority_score(o, weights)
-                db.add(o)
         db.commit()
+        from app.seed_workflow import seed_workflow
+
+        seed_workflow(db)
     print("seed complete")
 
 
+def reset() -> None:
+    """Delete ALL data (keeps the schema). Used to rebuild the demo workspace."""
+    from app.db import Base, get_engine
+
+    with get_engine().begin() as conn:
+        names = ", ".join(t.name for t in Base.metadata.sorted_tables)
+        conn.exec_driver_sql(f"TRUNCATE {names} RESTART IDENTITY CASCADE")
+    print("all tables truncated")
+
+
 if __name__ == "__main__":
+    import sys
+
+    if "--reset" in sys.argv:
+        reset()
     seed()

@@ -91,3 +91,13 @@ def client(engine, db):
 
 
 NOW = datetime(2026, 11, 20, 20, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+def workspace(db):
+    """Full demo workspace (providers, countries, fictional plants, relationships) in the test database."""
+    from app.seed import seed
+
+    seed()
+    db.expire_all()
+    return db

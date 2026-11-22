@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # Optional background sync. Manual sync is the default workflow.
     scheduler_enabled: bool = False
 
+    # API test bench: only these hosts may be called (prevents the server being used to probe internal networks).
+    api_test_allowed_hosts: list[str] = [
+        "www.smard.de", "smard.de", "web-api.tp.entsoe.eu", "www.marktstammdatenregister.de",
+        "marktstammdatenregister.de", "datahub-enedis.fr", "api.energidataservice.dk", "data.elexon.co.uk",
+    ]
+
     http_timeout_seconds: float = 30.0
     http_max_retries: int = 3
     http_backoff_base_seconds: float = 1.0

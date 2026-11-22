@@ -270,6 +270,8 @@ Score = Field(ge=1, le=5)
 class OpportunityBase(BaseModel):
     provider_id: int
     title: str = Field(min_length=3, max_length=200)
+    country_code: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    data_need: Literal["production_metering", "day_ahead_price", "plant_master_data"] | None = None
     customer_value: int = Score
     data_importance: int = Score
     commercial_opportunity: int = Score
@@ -288,6 +290,8 @@ class OpportunityCreate(OpportunityBase):
 
 class OpportunityUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=3, max_length=200)
+    country_code: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    data_need: Literal["production_metering", "day_ahead_price", "plant_master_data"] | None = None
     customer_value: int | None = Field(default=None, ge=1, le=5)
     data_importance: int | None = Field(default=None, ge=1, le=5)
     commercial_opportunity: int | None = Field(default=None, ge=1, le=5)
@@ -305,6 +309,8 @@ class OpportunityOut(ORM):
     provider_id: int
     provider_name: str | None = None
     country_code: str | None = None
+    data_need: str | None = None
+    demand: dict[str, Any] | None = None
     title: str
     customer_value: int
     data_importance: int

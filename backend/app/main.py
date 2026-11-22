@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api import connectors, energy, investigations, opportunities, providers, quality, system
+from app.api import connectors, energy, investigations, opportunities, providers, quality, system, workflow
 from app.config import get_settings
 from app.logging_config import configure_logging
 
@@ -38,5 +38,5 @@ async def integrity_error(_: Request, exc: IntegrityError):
     return JSONResponse(status_code=409, content={"detail": "Constraint violation", "error": str(exc.orig)[:300]})
 
 
-for r in (system, providers, connectors, energy, quality, opportunities, investigations):
+for r in (system, workflow, providers, connectors, energy, quality, opportunities, investigations):
     app.include_router(r.router)

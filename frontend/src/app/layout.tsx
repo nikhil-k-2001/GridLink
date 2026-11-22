@@ -8,8 +8,8 @@ const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GridLink — Energy Data Integration",
-  description: "Connect, standardise, validate and monitor energy data from multiple European markets.",
+  title: "GridLink — Market Connections Workspace",
+  description: "Make the data customers need accessible, reliable and usable across European energy markets.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

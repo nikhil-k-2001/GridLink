@@ -54,6 +54,7 @@ def upsert_energy_records(
                         dataset_id=dataset_ids.get(r.dataset_key),
                         connector_id=connector_id,
                         raw_payload_id=raw_payload_ids.get(r.payload_index),
+                        asset_id=r.asset_id,
                         timestamp_utc=r.timestamp_utc,
                         interval_minutes=r.interval_minutes,
                         country_code=r.country_code,

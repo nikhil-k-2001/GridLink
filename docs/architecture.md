@@ -126,3 +126,30 @@ every reason. An HTTP 200 sync can still be `degraded` (e.g. low completeness, o
 * One unparseable payload does not discard the others → sync status `partial`.
 * Every failure is a `sync_errors` row with stage, code and context; tokens are redacted from stored URLs.
 * Re-running a window is idempotent; provider revisions are counted as `updated`.
+
+## Market-connections workflow layer
+
+On top of the pipeline sits the work a market-connections TPM is accountable for (`app/api/workflow.py`,
+`app/services/coverage.py`, `app/services/issues.py`, `app/services/api_tests.py`):
+
+| Entity | Purpose |
+|---|---|
+| `customers`, `assets` | Plants under management and the data each one needs (`production_metering`, `day_ahead_price`, `plant_master_data`) |
+| `asset_authorisations` | What *we* believe about owner consent per data holder — re-checked against provider responses every sync |
+| `country_profiles`, `access_routes`, `playbook_steps` | Country access maps: actors, routes (primary + fallback, blockers, evidence), 10-step playbook, lessons learned |
+| `contacts`, `access_requests`, `interactions` | Relationship pipeline with follow-ups; lead time request → granted |
+| `data_issues` | Issues raised automatically at ingestion (incomplete data, authorisation denied, estimated values, duplicates, sync failures) and owned until resolved |
+| `api_tests` | Saved API experiments (redacted) that can be promoted to verified provider facts |
+
+**Coverage** gives every (plant, need) pair exactly one status — covered, awaiting owner, ask owner, no connector,
+route blocked, access denied, stale, no route — with a reason. Uncovered demand (plants, MW, customers) feeds the
+*customer value* of each prioritisation opportunity.
+
+**Simulated DSO platforms** (`app/simulated/`) are served in-process to the connectors (httpx `MockTransport`) and
+over HTTP at `/simulated/...` for the API test bench, so the same code path is exercised as with a real provider.
+They inject realistic defects: consent revoked at the DSO, a 36-hour gap, estimated readings, duplicate rows and
+rate limiting.
+
+**API test bench safety:** only allow-listed provider hosts (https) and the local `/simulated/` paths can be called,
+which prevents the server being used to reach internal addresses; credential-like parameters and headers are
+redacted before storage.

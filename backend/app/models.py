@@ -227,6 +227,7 @@ class EnergyRecord(Base):
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), index=True)
     connector_id: Mapped[int | None] = mapped_column(ForeignKey("connectors.id", ondelete="SET NULL"))
     raw_payload_id: Mapped[int | None] = mapped_column(ForeignKey("raw_payloads.id", ondelete="SET NULL"))
+    asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), index=True)
     timestamp_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # interval start, UTC
     interval_minutes: Mapped[int] = mapped_column(Integer)
     country_code: Mapped[str] = mapped_column(String(8))
@@ -278,6 +279,8 @@ class IntegrationOpportunity(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
+    country_code: Mapped[str | None] = mapped_column(String(8))
+    data_need: Mapped[str | None] = mapped_column(String(64))
     customer_value: Mapped[int] = mapped_column(Integer)
     data_importance: Mapped[int] = mapped_column(Integer)
     commercial_opportunity: Mapped[int] = mapped_column(Integer)
@@ -350,3 +353,253 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[dict] = mapped_column(JSONType)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# =====================================================================================================
+# Market-connections workflow: customers & plants -> countries & routes -> relationships -> issues
+# =====================================================================================================
+DATA_NEEDS = ("production_metering", "day_ahead_price", "plant_master_data")
+AUTH_STATUSES = ("not_requested", "requested", "granted", "refused", "revoked", "expired")
+ROUTE_TYPES = ("public_api", "authorised_api", "public_download", "portal_export", "file_delivery", "email_request",
+               "third_party")
+ROUTE_STATUSES = ("to_investigate", "investigating", "testing", "available", "in_use", "blocked", "rejected")
+REQUEST_STATUSES = ("draft", "sent", "awaiting_reply", "in_review", "granted", "rejected", "stalled")
+ISSUE_STATUSES = ("open", "investigating", "waiting_on_provider", "resolved")
+COUNTRY_STATUSES = ("not_started", "mapping", "access_in_progress", "partially_connected", "connected", "blocked")
+PLAYBOOK_STEPS = (
+    ("demand", "Quantify customer demand", "Which customers and plants need which data, in MW and contract terms."),
+    ("landscape", "Map market actors", "TSO, DSOs serving the plants, market operator, public registers."),
+    ("routes", "Identify access routes", "For every data need: who holds it, how to get it, and a fallback."),
+    ("contact", "Contact providers & request access", "Named contacts, access requests, follow-up cadence."),
+    ("authorise", "Collect plant-owner authorisations", "Consent / mandates per metering point where required."),
+    ("test", "Test API or sample files", "Real requests and responses saved as evidence."),
+    ("spec", "Write the integration spec", "Onboarding report: formats, units, time conventions, limits."),
+    ("build", "Build connector with engineering", "Mapping file + connector; reuse the common pipeline."),
+    ("validate", "Validate against expectations", "Completeness, units, plausibility vs plant capacity."),
+    ("monitor", "Monitor & hand over", "Health thresholds, alerting, runbook for Customer Operations."),
+)
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), unique=True)
+    segment: Mapped[str | None] = mapped_column(String(100))  # asset manager, fund, IPP...
+    account_owner: Mapped[str | None] = mapped_column(String(120))
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_fictional: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    assets: Mapped[list["Asset"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+
+
+class Asset(Base):
+    """A renewable plant under management. Plants create the demand for data connections."""
+
+    __tablename__ = "assets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    country_code: Mapped[str] = mapped_column(String(8), index=True)
+    bidding_zone: Mapped[str] = mapped_column(String(32))
+    technology: Mapped[str] = mapped_column(String(32))  # solar | wind_onshore | wind_offshore
+    capacity_mw: Mapped[float] = mapped_column(Float)
+    dso_provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"), index=True)
+    metering_point_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    commissioned_year: Mapped[int | None] = mapped_column(Integer)
+    data_needs: Mapped[list] = mapped_column(JSONType, default=list)
+    is_fictional: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    customer: Mapped[Customer] = relationship(back_populates="assets")
+    dso: Mapped[Provider | None] = relationship()
+    authorisations: Mapped[list["AssetAuthorisation"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
+
+
+class AssetAuthorisation(Base):
+    """GridLink's record of whether the plant owner has authorised access at a data holder."""
+
+    __tablename__ = "asset_authorisations"
+    __table_args__ = (
+        UniqueConstraint("asset_id", "provider_id", name="uq_auth_asset_provider"),
+        CheckConstraint(_in("status", AUTH_STATUSES), name="ck_auth_status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"))
+    provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(16), default="not_requested")
+    method: Mapped[str | None] = mapped_column(String(64))  # online consent, signed mandate, portal delegation
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    asset: Mapped[Asset] = relationship(back_populates="authorisations")
+    provider: Mapped[Provider] = relationship()
+
+
+class CountryProfile(Base):
+    __tablename__ = "country_profiles"
+    __table_args__ = (CheckConstraint(_in("status", COUNTRY_STATUSES), name="ck_country_status"),)
+
+    country_code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    bidding_zones: Mapped[list] = mapped_column(JSONType, default=list)
+    tso: Mapped[str | None] = mapped_column(String(200))
+    market_operator: Mapped[str | None] = mapped_column(String(200))
+    dso_landscape: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="not_started")
+    owner: Mapped[str | None] = mapped_column(String(120))
+    summary: Mapped[str | None] = mapped_column(Text)
+    lessons_learned: Mapped[str | None] = mapped_column(Text)
+    languages: Mapped[list] = mapped_column(JSONType, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AccessRoute(Base):
+    """One way to obtain one data need in one country. Several routes per need = primary + fallbacks."""
+
+    __tablename__ = "access_routes"
+    __table_args__ = (
+        CheckConstraint(_in("route_type", ROUTE_TYPES), name="ck_route_type"),
+        CheckConstraint(_in("status", ROUTE_STATUSES), name="ck_route_status"),
+        CheckConstraint(_in("evidence_level", EVIDENCE_LEVELS), name="ck_route_evidence"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(String(8), index=True)
+    data_need: Mapped[str] = mapped_column(String(64))
+    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"))
+    holder_name: Mapped[str] = mapped_column(String(200))
+    route_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32), default="to_investigate")
+    is_fallback: Mapped[bool] = mapped_column(Boolean, default=False)
+    effort: Mapped[str | None] = mapped_column(String(16))  # low | medium | high
+    requires_owner_authorisation: Mapped[bool] = mapped_column(Boolean, default=False)
+    blockers: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    evidence_level: Mapped[str] = mapped_column(String(16), default="assumption")
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    provider: Mapped[Provider | None] = relationship()
+
+
+class PlaybookStep(Base):
+    __tablename__ = "playbook_steps"
+    __table_args__ = (UniqueConstraint("country_code", "step_key", name="uq_playbook_step"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(ForeignKey("country_profiles.country_code", ondelete="CASCADE"), index=True)
+    step_key: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="todo")  # todo | in_progress | done | blocked | n/a
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(200))  # e.g. "Data services desk (shared mailbox)"
+    name: Mapped[str | None] = mapped_column(String(120))
+    email: Mapped[str | None] = mapped_column(String(200))
+    language: Mapped[str | None] = mapped_column(String(32))
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_placeholder: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    provider: Mapped[Provider] = relationship()
+
+
+class AccessRequest(Base):
+    __tablename__ = "access_requests"
+    __table_args__ = (CheckConstraint(_in("status", REQUEST_STATUSES), name="ck_request_status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"), index=True)
+    country_code: Mapped[str] = mapped_column(String(8))
+    data_need: Mapped[str] = mapped_column(String(64))
+    subject: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    owner: Mapped[str | None] = mapped_column(String(120))
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fallback_route_id: Mapped[int | None] = mapped_column(ForeignKey("access_routes.id", ondelete="SET NULL"))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    provider: Mapped[Provider] = relationship()
+    interactions: Mapped[list["Interaction"]] = relationship(back_populates="access_request")
+
+
+class Interaction(Base):
+    __tablename__ = "interactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"), index=True)
+    access_request_id: Mapped[int | None] = mapped_column(ForeignKey("access_requests.id", ondelete="SET NULL"), index=True)
+    contact_id: Mapped[int | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    channel: Mapped[str] = mapped_column(String(32))  # email | call | meeting | portal | ticket
+    direction: Mapped[str] = mapped_column(String(16))  # outbound | inbound
+    summary: Mapped[str] = mapped_column(Text)
+    next_follow_up: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    access_request: Mapped[AccessRequest | None] = relationship(back_populates="interactions")
+
+
+class DataIssue(Base):
+    __tablename__ = "data_issues"
+    __table_args__ = (CheckConstraint(_in("status", ISSUE_STATUSES), name="ck_issue_status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(300))
+    code: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    severity: Mapped[str] = mapped_column(String(16), default="medium")  # low | medium | high
+    source: Mapped[str] = mapped_column(String(16), default="auto")  # auto | manual
+    connector_id: Mapped[int | None] = mapped_column(ForeignKey("connectors.id", ondelete="SET NULL"), index=True)
+    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"))
+    sync_log_id: Mapped[int | None] = mapped_column(ForeignKey("sync_logs.id", ondelete="SET NULL"))
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    affected_asset_ids: Mapped[list] = mapped_column(JSONType, default=list)
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    evidence: Mapped[dict] = mapped_column(JSONType, default=dict)
+    hypotheses: Mapped[str | None] = mapped_column(Text)
+    root_cause: Mapped[str | None] = mapped_column(Text)
+    provider_contacted: Mapped[bool] = mapped_column(Boolean, default=False)
+    customer_update: Mapped[str | None] = mapped_column(Text)
+    resolution: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ApiTest(Base):
+    """A saved API experiment: exact request (secrets redacted), response excerpt and the conclusion drawn."""
+
+    __tablename__ = "api_tests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    method: Mapped[str] = mapped_column(String(8))
+    url: Mapped[str] = mapped_column(Text)
+    params: Mapped[dict] = mapped_column(JSONType, default=dict)
+    request_headers: Mapped[dict] = mapped_column(JSONType, default=dict)
+    request_body: Mapped[str | None] = mapped_column(Text)
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    content_type: Mapped[str | None] = mapped_column(String(200))
+    response_headers: Mapped[dict] = mapped_column(JSONType, default=dict)
+    response_excerpt: Mapped[str | None] = mapped_column(Text)
+    response_size: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    verdict: Mapped[str] = mapped_column(String(16), default="inconclusive")  # works | partial | fails | inconclusive
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
