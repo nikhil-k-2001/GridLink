@@ -8,3 +8,4 @@ node_modules/
 frontend/next-env.d.ts
 *.db
 .DS_Store
+.vercel

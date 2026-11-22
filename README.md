@@ -8,6 +8,8 @@ need* — and follows the work through: mapping how data can be accessed in each
 testing APIs, building reusable connectors with engineering, catching data issues before customers do, and
 turning each connection into a playbook that makes the next one faster.
 
+> **Live demo:** https://gridlink-web.vercel.app · API docs: https://gridlink-api.vercel.app/docs
+>
 > **Start here:** [How GridLink maps to the role](docs/role-mapping.md) ·
 > [5-minute demo script](docs/demo-script.md) · [First 90 days plan](docs/first-90-days.md)
 
@@ -157,18 +159,25 @@ connector health calculations, and the REST API (validation, pagination, 404/409
 
 ## Deployment
 
-Local development needs no paid service. For a hosted deployment:
+The live demo runs entirely on free tiers:
 
-1. **Database** — any PostgreSQL 14+; set `DATABASE_URL` (`postgresql+psycopg://…`).
-2. **API** — `docker build -t gridlink-api backend && docker run -p 8000:8000 --env-file backend/.env gridlink-api`
-   (the container runs `alembic upgrade head` on start). Run `python -m app.seed` once. Set `CORS_ORIGINS` to the web origin
-   (JSON list, e.g. `["https://gridlink.example.com"]`).
-3. **Web** — `cd frontend && NEXT_PUBLIC_API_URL=https://api.example.com npm run build && npm start` (or any Node host).
-4. **Scheduling** — either `SCHEDULER_ENABLED=true` on a **single** API instance, or call `POST /connectors/{id}/sync`
-   from an external cron.
-5. **Secrets** — tokens only via environment / secret manager; the API never returns them and redacts them from stored URLs.
+| Part | Where | Notes |
+|---|---|---|
+| Web (Next.js) | Vercel project `gridlink-web`, root `frontend/` | `NEXT_PUBLIC_API_URL=https://gridlink-api.vercel.app` (baked in at build time) |
+| API (FastAPI) | Vercel project `gridlink-api`, root `backend/`, functions in `fra1` | Zero-config FastAPI (`[tool.vercel] entrypoint = "app.main:app"`), 60 s max duration |
+| Database | Supabase Postgres (Frankfurt) via the Vercel Marketplace | Injects `POSTGRES_URL` (pooled) and `POSTGRES_URL_NON_POOLING` (migrations) |
+| Daily refresh | Vercel Cron → `GET /cron/daily-sync` at 06:00 UTC | Protected by `CRON_SECRET`; refreshes SMARD and the simulated DSO connectors (also keeps the free database active) |
 
----
+On first start with `AUTO_SETUP=true` the API runs Alembic migrations and seeds the demo workspace under a
+Postgres advisory lock (taken on the direct connection, never through the transaction pooler). `/health`
+reports the setup state. Pushing to `main` redeploys both projects.
+
+Any PostgreSQL 14+ works elsewhere: set `DATABASE_URL` (or `POSTGRES_URL`), optionally a direct
+`POSTGRES_URL_NON_POOLING` / `DATABASE_URL_UNPOOLED`, and run `docker build -t gridlink-api backend` for a container
+deployment. Secrets are only ever read from the environment and are redacted from stored URLs.
+
+> The public demo has no login: anyone can sync connectors or edit records. That is deliberate for a portfolio
+> demo; a real deployment would add SSO and roles first.
 
 ## Known limitations / next steps
 
